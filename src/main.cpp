@@ -5,6 +5,9 @@
 #include <string>
 #include <unordered_map>
 #include <sqlite3.h>
+#include <sqlite_modern_cpp.h>
+#include "database.hpp"
+
 
 void CommandAddition(TgBot::Bot& mybot , std::vector<TgBot::BotCommand::Ptr>& cmdstorage, const std::string title , const std::string descrp);
 void FileReader(std::ostringstream& buffer , const std::string path);
@@ -26,6 +29,7 @@ std::unordered_map<int64_t , UserState> UserStates;
 // TODO Состояние ожидания у каждой команды
 
 int main() {
+    Database db("../db/notes.db");
 
     std::ostringstream response;
     FileReader(response , "../src/help_response.txt");
@@ -50,8 +54,8 @@ int main() {
 
     bot.getEvents().onCommand("start", [&bot , &response](TgBot::Message::Ptr msg) {
         awaitingText[msg->chat->id] = false;
-        UserStates[msg->chat->id] = UserState::none;
-        bot.getApi().sendMessage( msg->chat->id, "Привет,  "+ msg->chat->firstName +"!\nЯ бот-хранитель твоих заметок!");
+        UserStates[msg->chat->id] = UserState::NONE;
+        bot.getApi().sendMessage( msg->chat->id, "Привет, "+ msg->chat->firstName +"!\nЯ бот-хранитель твоих заметок!");
         bot.getApi().sendMessage(msg->chat->id , response.str() );
     });
 
