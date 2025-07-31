@@ -55,4 +55,5 @@ if(NOT WIN32)
 endif()
 
 # Копируем необходимые файлы в build директорию
-configure_file(${CMAKE_SOURCE_DIR}/src/help_response.txt ${CMAKE_BINARY_DIR}/help_response.txt COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/files/help_response.txt ${CMAKE_BINARY_DIR}/help_response.txt COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/files/token.txt ${CMAKE_BINARY_DIR}/token.txt COPYONLY)
