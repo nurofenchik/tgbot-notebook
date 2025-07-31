@@ -48,7 +48,9 @@ int main() {
     bot.getApi().setMyCommands(commands);
 
 
-
+    std::string title;
+    std::string body;
+    std::vector<Note> usernotes;
 
 
 
@@ -66,23 +68,84 @@ int main() {
         UserStates[msg->chat->id] = UserState::WAITING_TITLE;
     });
 
-    bot.getEvents().onCommand("list" , [&bot](TgBot::Message::Ptr msg){
-        bot.getApi().sendMessage(msg->chat->id , "test txt");
+    bot.getEvents().onCommand("list" , [&bot , &db , &usernotes](TgBot::Message::Ptr msg){
+        db.getNotes( msg->chat->id , usernotes);
+        int len = usernotes.size();
+        if( len > 0 )
+        {
+            std::string meganote;
+            meganote += "Список твои заметок:\n\n";
+            for(int i = 0 ; i < len ; i++ )
+            {
+                meganote += std::to_string(i+1) + ". " + usernotes[i].title + " - " + usernotes[i].body+"\n";
+            }
+            bot.getApi().sendMessage(msg->chat->id , meganote);
+            meganote.clear();
+        }
+        else
+        {
+            bot.getApi().sendMessage(msg->chat->id , "Твой список заметок пуст");
+        }
+        usernotes.clear();
+        
     });
 
-    bot.getEvents().onCommand("delete" , [&bot](TgBot::Message::Ptr msg){
-        bot.getApi().sendMessage(msg->chat->id , "Выбери заметку, которую хочешь удалить");
+    bot.getEvents().onCommand("delete" , [&bot , &db , &usernotes](TgBot::Message::Ptr msg){
+        awaitingText[msg->chat->id] = false;
+        UserStates[msg->chat->id] = UserState::NONE;
+        db.getNotes( msg->chat->id , usernotes);
+        int len = usernotes.size();
+        if( len > 0)
+        {
+            TgBot::InlineKeyboardMarkup::Ptr keyboard(new TgBot::InlineKeyboardMarkup);
+            for( const auto& note : usernotes)
+            {
+                TgBot::InlineKeyboardButton::Ptr button( new TgBot::InlineKeyboardButton);
+                button->text = note.title;
+                button->callbackData = note.title;
+                keyboard->inlineKeyboard.push_back( {button} );
+            }
+            bot.getApi().sendMessage(msg->chat->id , "Выбери заголовок заметки для удаления" , 0 , 0 , keyboard);
+        }
+        else
+        {
+            bot.getApi().sendMessage(msg->chat->id , "Твой список заметок пуст");
+        }
+        usernotes.clear();
     });
 
-    bot.getEvents().onCommand("clear" , [&bot](TgBot::Message::Ptr msg){
-        bot.getApi().sendMessage(msg->chat->id , "test txt");
+    bot.getEvents().onCallbackQuery([&bot , &db , &usernotes](TgBot::CallbackQuery::Ptr query) {
+        awaitingText[query->message->chat->id] = false;
+        UserStates[query->message->chat->id] = UserState::NONE;
+        db.getNotes(query->message->chat->id , usernotes);
+        bool deleted = false;
+        for( auto& note : usernotes )
+        {
+            if( note.title == query->data )
+            {
+                db.clearNoteByTitle(query->message->chat->id , note.title);
+                bot.getApi().sendMessage(query->message->chat->id , "Заметка успешно удалена!");
+                deleted = true;
+            }
+        }
+        if( !deleted )
+        {
+            bot.getApi().sendMessage(query->message->chat->id , "Такой заметки больше не существует");
+        }
+        deleted = false;
+        usernotes.clear();
+    });
+
+    bot.getEvents().onCommand("clear" , [&bot , &db](TgBot::Message::Ptr msg){
+        bot.getApi().sendMessage(msg->chat->id , "Все заметки успешно удалены!");
+        db.clearNotes(msg->chat->id);
     });
 
     bot.getEvents().onCommand("help" , [&bot , &response](TgBot::Message::Ptr msg){
         bot.getApi().sendMessage(msg->chat->id , response.str() );
     });
 
-    bot.getEvents().onAnyMessage([&bot , &commands](TgBot::Message::Ptr msg) {
+    bot.getEvents().onAnyMessage([&bot , &commands , &title , &body , &db](TgBot::Message::Ptr msg) {
         for( const auto& cmd : commands)
         {
             if( "/" + cmd->command == msg->text)
@@ -92,19 +155,23 @@ int main() {
         }
         if( awaitingText[msg->chat->id ] == true && in(UserStates[msg->chat->id] , {UserState::WAITING_TITLE , UserState::WAITING_BODY} ) )
         {
-            std::string text;
             if( UserStates[msg->chat->id] == UserState::WAITING_TITLE )
             {
-                text = msg->text;
+                title = msg->text;
                 bot.getApi().sendMessage(msg->chat->id , "Введи текст заметки");
                 UserStates[msg->chat->id] = UserState::WAITING_BODY;
+                return;
             }
             else if( UserStates[msg->chat->id] == UserState::WAITING_BODY)
             {
-                text = msg->text;
+                body = msg->text;
+                db.addNote(msg->chat->id , title , body);
                 bot.getApi().sendMessage(msg->chat->id , "Заметка сохранена");
                 UserStates[msg->chat->id] = UserState::NONE;
                 awaitingText[msg->chat->id] = false;
+                title.clear();
+                body.clear();
+                return;
             }
         }
         bot.getApi().sendMessage( msg->chat->id , "Неизвестная команда, используйте /help ");

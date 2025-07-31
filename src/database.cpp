@@ -22,18 +22,21 @@ void Database::addNote(int64_t userId, const std::string& title, const std::stri
        << userId << title << body;
 }
 
-std::vector<Note> Database::getNotes(int64_t userId) {
+void Database::getNotes(int64_t userId , std::vector<Note>& notes) {
     sqlite::database db(dbPath);
-    std::vector<Note> notes;
 
     db << "SELECT id, title, body FROM notes WHERE user_id = ?;"
        << userId
        >> [&](int id, std::string title, std::string body) {
             notes.push_back({id, std::move(title), std::move(body)});
        };
-
-    return notes;
 }
+
+void Database::clearNoteByTitle(int64_t userId , const std::string& title) {
+    sqlite::database db(dbPath);
+    db << "DELETE FROM notes WHERE user_id = ? AND title = ?;" << userId << title;
+}
+
 
 void Database::clearNotes(int64_t userId) {
     sqlite::database db(dbPath);

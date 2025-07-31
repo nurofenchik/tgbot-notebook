@@ -14,8 +14,9 @@ public:
     explicit Database(const std::string& path);
 
     void addNote(int64_t userId, const std::string& title, const std::string& body);
-    std::vector<Note> getNotes(int64_t userId);
+    void getNotes(int64_t userId , std::vector<Note>& notes);
     void clearNotes(int64_t userId);
+    void clearNoteByTitle(int64_t userId , const std::string& title);
 
 private:
     std::string dbPath;
